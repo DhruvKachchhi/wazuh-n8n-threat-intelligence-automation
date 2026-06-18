@@ -1,0 +1,261 @@
+{
+  "name": "Wazuh Malicious File Detection",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "wazuh-malware",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        -720,
+        0
+      ],
+      "id": "ebba834b-ba9c-4e18-bb02-8f127c351d7c",
+      "name": "Wazuh Alert",
+      "webhookId": "ec0792db-05a5-4739-99ef-f89ded4a1102"
+    },
+    {
+      "parameters": {
+        "jsCode": "const alert = $json.body.body;\n\nreturn [{\n  json: {\n    file_path: alert.syscheck.path,\n    md5: alert.syscheck.md5_after,\n    sha1: alert.syscheck.sha1_after,\n    sha256: alert.syscheck.sha256_after,\n    agent: alert.agent.name,\n    rule: alert.rule.description\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -480,
+        0
+      ],
+      "id": "f8ec39a5-344d-4574-aeea-a4fa716ea63e",
+      "name": "Extract IOCs"
+    },
+    {
+      "parameters": {
+        "url": "=https://www.virustotal.com/api/v3/files/{{$json.sha256}}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "x-apikey",
+              "value": "YOUR_VIRUSTOTAL_API_KEY"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        -240,
+        0
+      ],
+      "id": "754cf82f-3994-4e0b-ba70-c6b243a74111",
+      "name": "VirusTotal File Hash Validation",
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "8c8172fe-c075-4761-898e-064e106ea432",
+              "leftValue": "={{$json.malicious}}",
+              "rightValue": 0,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "looseTypeValidation": true,
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        288,
+        208
+      ],
+      "id": "b5cee614-dc03-4647-bf7c-bc630d86b178",
+      "name": "Filter Suspicious Files"
+    },
+    {
+      "parameters": {
+        "jsCode": "if (!$json.data) {\n  return [{\n    json: {\n      status: \"not_found\",\n      subject: \"[INFO] File Not Found In VirusTotal\",\n      html: `\n      <div style=\"font-family:Arial,sans-serif;\">\n        <h2>VirusTotal has no information for this file.</h2>\n      </div>\n      `\n    }\n  }];\n}\n\nconst stats = $json.data.attributes.last_analysis_stats;\n\nconst malicious = stats.malicious || 0;\nconst suspicious = stats.suspicious || 0;\nconst harmless = stats.harmless || 0;\nconst undetected = stats.undetected || 0;\n\nlet riskLevel = \"LOW\";\n\nif (malicious >= 30) {\n  riskLevel = \"CRITICAL\";\n} else if (malicious >= 10) {\n  riskLevel = \"HIGH\";\n} else if (malicious >= 3) {\n  riskLevel = \"MEDIUM\";\n}\n\nlet severityColor = \"#4CAF50\";\n\nif (riskLevel === \"MEDIUM\") {\n  severityColor = \"#FF9800\";\n} else if (riskLevel === \"HIGH\") {\n  severityColor = \"#F44336\";\n} else if (riskLevel === \"CRITICAL\") {\n  severityColor = \"#8B0000\";\n}\n\nconst ioc = $('Extract IOCs').first().json;\n\nconst html = `\n<div style=\"font-family:Arial,sans-serif;max-width:900px;\">\n\n<h1 style=\"\nbackground:#d32f2f;\ncolor:white;\npadding:15px;\nmargin:0;\n\">\n🚨 Malware Detection Alert\n</h1>\n\n<br>\n\n<h2>Incident Summary</h2>\n\n<table border=\"1\" cellpadding=\"10\" cellspacing=\"0\" width=\"100%\">\n<tr>\n<td><b>Severity</b></td>\n<td style=\"color:${severityColor};font-weight:bold;\">\n${riskLevel}\n</td>\n</tr>\n\n<tr>\n<td><b>Agent</b></td>\n<td>${ioc.agent}</td>\n</tr>\n\n<tr>\n<td><b>Detection Rule</b></td>\n<td>${ioc.rule}</td>\n</tr>\n\n<tr>\n<td><b>File Path</b></td>\n<td>${ioc.file_path}</td>\n</tr>\n</table>\n\n<br>\n\n<h2>File Hash Information</h2>\n\n<table border=\"1\" cellpadding=\"10\" cellspacing=\"0\" width=\"100%\">\n<tr>\n<td><b>MD5</b></td>\n<td>${ioc.md5}</td>\n</tr>\n\n<tr>\n<td><b>SHA1</b></td>\n<td>${ioc.sha1}</td>\n</tr>\n\n<tr>\n<td><b>SHA256</b></td>\n<td>${ioc.sha256}</td>\n</tr>\n</table>\n\n<br>\n\n<h2>VirusTotal Analysis</h2>\n\n<table border=\"1\" cellpadding=\"10\" cellspacing=\"0\" width=\"100%\">\n<tr>\n<td><b>Malicious Engines</b></td>\n<td>${malicious}</td>\n</tr>\n\n<tr>\n<td><b>Suspicious Engines</b></td>\n<td>${suspicious}</td>\n</tr>\n\n<tr>\n<td><b>Harmless Engines</b></td>\n<td>${harmless}</td>\n</tr>\n\n<tr>\n<td><b>Undetected Engines</b></td>\n<td>${undetected}</td>\n</tr>\n</table>\n\n<br>\n\n<h2>Recommended Actions</h2>\n\n<ul>\n<li>Review the file source and execution history.</li>\n<li>Investigate endpoint activity.</li>\n<li>Perform IOC hunting across the environment.</li>\n<li>Quarantine or remove the file if malicious.</li>\n<li>Check for lateral movement or persistence mechanisms.</li>\n</ul>\n\n<br>\n\n<a href=\"https://www.virustotal.com/gui/file/${ioc.sha256}\"\nstyle=\"\nbackground:#1976d2;\ncolor:white;\npadding:12px 20px;\ntext-decoration:none;\nborder-radius:5px;\nfont-weight:bold;\n\">\nOpen VirusTotal Report\n</a>\n\n<br><br>\n\n<hr>\n\n<p style=\"color:gray;\">\nGenerated automatically by Wazuh + n8n Security Automation Workflow\n</p>\n\n</div>\n`;\n\nreturn [{\n  json: {\n    status: \"found\",\n    riskLevel,\n    malicious,\n    suspicious,\n    harmless,\n    undetected,\n\n    file_path: ioc.file_path,\n    md5: ioc.md5,\n    sha1: ioc.sha1,\n    sha256: ioc.sha256,\n\n    agent: ioc.agent,\n    rule: ioc.rule,\n\n    html,\n\n    subject: `[${riskLevel}] Malware Alert - ${ioc.agent}`\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        16,
+        0
+      ],
+      "id": "5306fbce-2500-4510-a955-be262eaf582f",
+      "name": "Generate File Summary"
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{\n  json: {\n    ...$json\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        272,
+        -208
+      ],
+      "id": "86b0e644-15ed-4446-9e36-49829a334d18",
+      "name": "file summary display"
+    },
+    {
+      "parameters": {
+        "sendTo": "soc@example.com",
+        "subject": "={{$json.subject}}",
+        "message": "={{$json.html}}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.2,
+      "position": [
+        560,
+        -208
+      ],
+      "id": "4b33e125-e5f2-44ce-af85-0f3f43238643",
+      "name": "Gmail1",
+      "webhookId": "22371960-a245-4e5e-9a4b-0db0dfe6e61c",
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "WVtPoUeKP4uU3t7X",
+          "name": "Gmail OAuth2 API"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0B9TKGBR1B",
+          "mode": "list",
+          "cachedResultName": "security-alerts"
+        },
+        "text": "=🚨 SECURITY ALERT\n\nSeverity: {{$json.riskLevel}}\n\nAgent: {{$json.agent}}\n\nRule:\n{{$json.rule}}\n\nFile:\n{{$json.file_path}}\n\nSHA256:\n{{$json.sha256}}\n\nMalicious Engines:\n{{$json.malicious}}\n\nVirusTotal:\nhttps://www.virustotal.com/gui/file/{{$json.sha256}}",
+        "otherOptions": {}
+      },
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.5,
+      "position": [
+        576,
+        192
+      ],
+      "id": "88d9adf2-2c83-4821-89a9-3f8f93b78d07",
+      "name": "Slack File Alert",
+      "webhookId": "92f14f4b-f9ae-4263-ae9f-50e154ed7841",
+      "credentials": {
+        "slackApi": {
+          "id": "ncVDtU5Un7pKkz1m",
+          "name": "Slack account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Wazuh Alert": {
+      "main": [
+        [
+          {
+            "node": "Extract IOCs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract IOCs": {
+      "main": [
+        [
+          {
+            "node": "VirusTotal File Hash Validation",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "VirusTotal File Hash Validation": {
+      "main": [
+        [
+          {
+            "node": "Generate File Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Filter Suspicious Files": {
+      "main": [
+        [
+          {
+            "node": "Slack File Alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        []
+      ]
+    },
+    "Generate File Summary": {
+      "main": [
+        [
+          {
+            "node": "Filter Suspicious Files",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "file summary display",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "file summary display": {
+      "main": [
+        [
+          {
+            "node": "Gmail1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Slack File Alert": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "1df79751-92b8-4a65-9f61-49b62e599234",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "d2c915a0ad2992bd4987b5534a192a68f2a49fb5c6757a5f4cd110255994abf0"
+  },
+  "id": "B6RihObG4XCVWuY9",
+  "tags": []
+}
