@@ -1,5 +1,5 @@
 {
-  "name": "wazuh-malicious-file-detection.json",
+  "name": "Wazuh Malicious File Detection.json",
   "nodes": [
     {
       "parameters": {
