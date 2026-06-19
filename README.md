@@ -53,9 +53,18 @@ Wazuh → n8n → VirusTotal → Gmail / Slack
 ## Repository Structure
 
 ```text
-workflow/
-└── Wazuh Malicious File Detection.json
+.
+├── README.md
+├── LICENSE
+├── workflow/
+│   └── wazuh-malicious-file-detection.json
+│
+└── screenshots/
+    ├── n8n-workflow.png
+    ├── gmail-alert-part1.png
+    └── gmail-alert-part2.png
 ```
+
 
 ## Security Note
 
