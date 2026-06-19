@@ -19,6 +19,17 @@ Wazuh → n8n → VirusTotal → Gmail / Slack
 * Slack security alert notifications
 * Security workflow orchestration using n8n
 
+## Screenshots
+
+### n8n Workflow
+![n8n Workflow](screenshots/n8n-workflow.png)
+
+### Incident Report Overview
+![Incident Report Overview](screenshots/gmail-alert-part1.png)
+
+### Incident Report Analysis
+![Incident Report Analysis](screenshots/gmail-alert-part2.png)
+
 ## Technologies Used
 
 * Wazuh SIEM
