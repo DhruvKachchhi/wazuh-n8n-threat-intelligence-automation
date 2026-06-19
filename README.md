@@ -70,15 +70,10 @@ Wazuh → n8n → VirusTotal → Gmail / Slack
 
 All credentials, API keys, email addresses, and sensitive information have been removed or sanitized before publication.
 
-## Future Improvements
 
-* ServiceNow integration
-* Automated ticket creation
-* IOC enrichment from multiple threat intelligence feeds
-* Automated response actions
-* SOAR playbook expansion
 
 ## Author
 
 Dhruv Kachchhi
-Aspiring SOC Analyst
+
+Aspiring SOC Analyst | Security Operations | Threat Detection | Incident Response
